@@ -1,0 +1,128 @@
+/*********************************************************************************************************************
+Copyright (c) 2023 Vanjee
+All rights reserved
+
+By downloading, copying, installing or using the software you agree to this
+license. If you do not agree to this license, do not download, install, copy or
+use the software.
+
+License Agreement
+For Vanjee LiDAR SDK Library
+(3-clause BSD License)
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+
+3. Neither the names of the Vanjee, nor Wanji Technology, nor the
+names of other contributors may be used to endorse or promote products derived
+from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*********************************************************************************************************************/
+
+#pragma once
+#include <vanjee_driver/msg/device_ctrl_msg.hpp>
+
+#include "source/source.hpp"
+#ifdef ROS_FOUND
+#include <ros/ros.h>
+#include <vanjee_lidar_sdk/VanjeeLidarMultiPacket.h>
+namespace vanjee {
+namespace lidar {
+inline std::shared_ptr<MultiPacket> getRosMsg(const vanjee_lidar_sdk::VanjeeLidarMultiPacket::ConstPtr &msg) {
+  std::shared_ptr<MultiPacket> vanjee_msg = std::shared_ptr<MultiPacket>(new MultiPacket());
+  vanjee_msg->seq = msg->header.seq;
+  vanjee_msg->timestamp = msg->header.stamp.toSec();
+
+  vanjee_msg->buf = std::move(msg->data);
+  vanjee_msg->sizes = std::move(msg->sizes);
+  return vanjee_msg;
+}
+
+class SourceMultiPacketRos : public SourceMultiPacket {
+ private:
+  std::shared_ptr<ros::NodeHandle> nh_;
+  ros::Subscriber packet_sub_;
+  std::string frame_id_;
+
+ public:
+  virtual ~SourceMultiPacketRos() = default;
+  virtual void init(const YAML::Node &config);
+  void recvMultiPacket(const vanjee_lidar_sdk::VanjeeLidarMultiPacket::ConstPtr &msg);
+};
+
+inline void SourceMultiPacketRos::init(const YAML::Node &config) {
+  yamlRead<std::string>(config["ros"], "ros_frame_id", frame_id_, "vanjee_lidar");
+  std::string ros_recv_topic;
+  yamlRead<std::string>(config["ros"], "ros_packet_topic", ros_recv_topic, "vanjee_lidar_packet");
+
+  nh_ = std::unique_ptr<ros::NodeHandle>(new ros::NodeHandle());
+  packet_sub_ = nh_->subscribe<vanjee_lidar_sdk::VanjeeLidarMultiPacket>(ros_recv_topic, 100, &SourceMultiPacketRos::recvMultiPacket, this);
+}
+inline void SourceMultiPacketRos::recvMultiPacket(const vanjee_lidar_sdk::VanjeeLidarMultiPacket::ConstPtr &msg) {
+  cached_message_.push(getRosMsg(msg));
+}
+
+}  // namespace lidar
+}  // namespace vanjee
+
+#endif
+#ifdef ROS2_FOUND
+#include <rclcpp/rclcpp.hpp>
+
+#include "source/source_ros_msg_delegate.hpp"
+#include "vanjee_lidar_sdk/msg/vanjee_lidar_multi_packet.hpp"
+namespace vanjee {
+namespace lidar {
+inline std::shared_ptr<MultiPacket> getRosMsg(const vanjee_lidar_sdk::msg::VanjeeLidarMultiPacket::SharedPtr msg) {
+  std::shared_ptr<MultiPacket> vanjee_msg = std::shared_ptr<MultiPacket>(new MultiPacket());
+  vanjee_msg->timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+
+  vanjee_msg->buf = std::move(msg->data);
+  vanjee_msg->sizes = std::move(msg->sizes);
+  return vanjee_msg;
+}
+
+class SourceMultiPacketRos : virtual public SourceMultiPacket {
+ private:
+  using PacketMsgSubPtr = std::shared_ptr<VanjeeLidarSdkSubscribeRosMsg<vanjee_lidar_sdk::msg::VanjeeLidarMultiPacket, vanjee::lidar::MultiPacket>>;
+  PacketMsgSubPtr packet_msg_sub_ptr_;
+  std::string frame_id_;
+
+ public:
+  virtual ~SourceMultiPacketRos() = default;
+  virtual void init(const YAML::Node &config);
+  void recvMultiPacket(const vanjee_lidar_sdk::msg::VanjeeLidarMultiPacket::SharedPtr msg);
+};
+
+inline void SourceMultiPacketRos::init(const YAML::Node &config) {
+  yamlRead<std::string>(config["ros"], "ros_frame_id", frame_id_, "vanjee_lidar");
+  std::string ros_recv_topic;
+  yamlRead<std::string>(config["ros"], "ros_packet_topic", ros_recv_topic, "vanjee_lidar_packet");
+  rclcpp::QoS qos = makeQosFromYaml(config["ros"]["ros_qos_multi_packet"], 10);
+  packet_msg_sub_ptr_ = VanjeeLidarSdkNode::CreateInstance()->GetMultiPacketMsgSubscriber(ros_recv_topic, qos);
+  packet_msg_sub_ptr_->SubscribeTopic(std::bind(&SourceMultiPacketRos::recvMultiPacket, this, std::placeholders::_1));
+}
+inline void SourceMultiPacketRos::recvMultiPacket(const vanjee_lidar_sdk::msg::VanjeeLidarMultiPacket::SharedPtr msg) {
+  cached_message_.push(getRosMsg(msg));
+}
+
+}  // namespace lidar
+}  // namespace vanjee
+#endif

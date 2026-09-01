@@ -1,0 +1,23 @@
+#ROS build directories
+/.catkin_workspace
+/.vscode/
+/google_test/
+/test/.vscode/
+/test/build/
+/test_data/
+/build_test/
+/build/
+/devel/
+/src/vanjee_lidar_sdk/build/
+/src/vanjee_lidar_sdk/.vscode/
+/src/vanjee_lidar_sdk/src/vanjee_driver/build/
+/src/vanjee_lidar_sdk/src/vanjee_driver/demo/build/
+/src/vanjee_lidar_sdk/src/vanjee_driver/lib/lib/build/
+/src/vanjee_lidar_sdk/src/vanjee_driver/lib/demo/build/
+
+tocken
+
+#ROS2 build directories
+/install/
+/log/
+

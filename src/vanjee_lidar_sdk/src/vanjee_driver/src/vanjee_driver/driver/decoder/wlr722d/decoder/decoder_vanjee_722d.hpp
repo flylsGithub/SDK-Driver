@@ -1,0 +1,1499 @@
+/*********************************************************************************************************************
+Copyright (c) 2023 Vanjee
+All rights reserved
+
+By downloading, copying, installing or using the software you agree to this
+license. If you do not agree to this license, do not download, install, copy or
+use the software.
+
+License Agreement
+For Vanjee LiDAR SDK Library
+(3-clause BSD License)
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+
+3. Neither the names of the Vanjee, nor Wanji Technology, nor the
+names of other contributors may be used to endorse or promote products derived
+from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*********************************************************************************************************************/
+
+#pragma once
+
+#include <vanjee_driver/driver/decoder/decoder_packet_base/imu/imuParamGet.hpp>
+#include <vanjee_driver/driver/decoder/imu_calibration_param.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/cmd_repository_722d.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_acceleration_range_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_acceleration_range_set.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_firmware_version_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_flash_data_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_flash_data_set.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_ld_enable.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_ldvalue_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_lidar_state.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_scan_data_state_set.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_sn_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_work_mode_get.hpp>
+#include <vanjee_driver/driver/decoder/wlr722d/protocol/frames/protocol_work_mode_set.hpp>
+#include <vanjee_driver/driver/difop/cmd_class.hpp>
+#include <vanjee_driver/driver/difop/protocol_abstract.hpp>
+#include <vanjee_driver/driver/difop/protocol_base.hpp>
+
+namespace vanjee {
+namespace lidar {
+#pragma pack(push, 1)
+typedef struct _Vanjee722dSerialBlockChannel {
+  uint16_t distance;
+  uint8_t reflectivity;
+} Vanjee722dSerialBlockChannel;
+
+typedef struct _Vanjee722dSerialPointCloud {
+  uint16_t azimuth;
+  Vanjee722dSerialBlockChannel channel[16];
+  uint32_t dirty_degree;
+  uint8_t lidar_state;
+  uint8_t reserved_id;
+  uint16_t reserved_info;
+  uint16_t sequence_num;
+} Vanjee722dSerialPointCloud;
+
+typedef struct _Vanjee722dSerialPointCloudMsopPkt {
+  uint8_t head[2];
+  uint8_t protocol_major_version;
+  uint8_t protocol_minor_version;
+  uint8_t diagnostic_information_version;
+  uint8_t data_type;
+  uint8_t datetime[6];
+  uint8_t timestamp[4];
+  Vanjee722dSerialPointCloud blocks;
+  uint32_t crc;
+} Vanjee722dSerialPointCloudMsopPkt;
+
+typedef struct _Vanjee722dSerialImu {
+  int16_t imu_linear_acce_x;
+  int16_t imu_linear_acce_y;
+  int16_t imu_linear_acce_z;
+  int16_t imu_angle_voc_x;
+  int16_t imu_angle_voc_y;
+  int16_t imu_angle_voc_z;
+  uint16_t sequence_num;
+} Vanjee722dSerialImu;
+
+typedef struct _Vanjee722dSerialImuMsopPkt {
+  uint8_t head[2];
+  uint8_t protocol_major_version;
+  uint8_t protocol_minor_version;
+  uint8_t diagnostic_information_version;
+  uint8_t data_type;
+  uint8_t datetime[6];
+  uint8_t timestamp[4];
+  Vanjee722dSerialImu blocks;
+  uint32_t crc;
+} Vanjee722dSerialImuMsopPkt;
+
+typedef struct _Vanjee722dSerialFaultCodeMsopPkt {
+  uint8_t head[2];
+  uint8_t fs_version;
+  uint8_t datetime[6];
+  uint8_t timestamp[4];
+  uint8_t state_and_counter;
+  uint8_t fault_code_info;
+  uint16_t fault_code;
+  uint8_t reserved[20];
+  uint32_t crc;
+} Vanjee722dSerialFaultCodeMsopPkt;
+
+typedef struct _Vanjee722dResolutionState {
+  int count_30 = 0;
+  int count_60 = 0;
+  int count_120 = 0;
+  int last_value = -1;
+  int last_non_negative_result = -1;
+  bool non_negative_result_flag = false;
+
+  void paramInit(bool result_flag = false, int lst_result = -1, int lst_value = -1, int cnt_30 = 0, int cnt_60 = 0, int cnt_120 = 0) {
+    count_30 = cnt_30;
+    count_60 = cnt_60;
+    count_120 = cnt_120;
+    last_value = lst_value;
+    last_non_negative_result = lst_result;
+    non_negative_result_flag = result_flag;
+  }
+} Vanjee722dResolutionState;
+#pragma pack(pop)
+
+template <typename T_PointCloud>
+class DecoderVanjee722D : public Decoder<T_PointCloud> {
+ private:
+  int32_t optcent_2_lidar_arg_ = 21652;
+  float optcent_2_lidar_l_ = 2.21423 * 1e-2;
+  float optcent_2_lidar_z_ = 2.8 * 1e-3;
+
+  std::vector<std::vector<double>> all_points_luminous_moment_serial_;  // Cache 16 channels for one circle of point cloud time difference
+
+  const double luminous_period_of_ld_ = 1.11111 * 1e-4;           // Time interval at adjacent horizontal angles
+  const double luminous_period_of_adjacent_ld_ = 6.94444 * 1e-6;  // Time interval between adjacent vertical angles within the group
+
+  int32_t pre_hor_angle_ = -1;
+
+  int16_t lidar_temperature_ = -27315;
+  double temperature_update_ts_ = 0;
+
+  int8_t pre_fault_code_frame_id_ = -1;
+  int32_t pre_imu_frame_id_ = -1;
+  int32_t pre_point_cloud_frame_id_ = -1;
+  int32_t pre_difop_frame_id_ = -1;
+  uint8_t publish_mode_ = 0;
+
+  bool angle_param_get_flag_ = false;
+  bool firmware_version_get_flag_ = false;
+  bool sn_get_flag_ = false;
+  bool acceleration_protocol_flag = false;
+  bool acceleration_range_get_flag_ = false;
+  bool scan_data_state_set_flag_ = true;
+  bool scan_data_state_flag_ = true;
+  double pre_temperature_data_publish_ts_ = 0;
+  std::vector<int32_t> eccentricity_angles_;
+  std::vector<int32_t> eccentricity_angles_real_;
+
+  Vanjee722dResolutionState resolution_state_;
+
+  std::map<uint16, std::string> get_lidar_param_;
+
+  std::vector<uint8_t> buf_cache_1_;
+  std::vector<uint8_t> buf_cache_2_;
+  std::map<uint16, std::vector<uint8_t>> cloud_pkt_map_ptr_;
+  uint16_t next_expected_seq_ = 0;
+  bool has_started_ = false;
+  uint32_t cache_size_ = 120;
+
+  std::shared_ptr<SplitStrategy> split_strategy_;
+  static WJDecoderConstParam &getConstParam();
+  ChanAngles chan_angles_;
+  void initLdLuminousMoment(void);
+  void lidarFormatParameterPublish(double pkt_ts, double pkt_host_ts);
+  void setScanDataState(bool state);
+  int32_t checkResolution(int32_t resolution, Vanjee722dResolutionState &state);
+
+ public:
+  constexpr static double FRAME_DURATION = 0.1;
+  constexpr static uint32_t SINGLE_PKT_NUM = 300;
+
+  bool dataParsing(uint8_t id, std::vector<uint8_t> &buf_cache, const uint8_t *pkt, size_t size);
+  virtual bool decodeMsopPkt(const uint8_t *pkt, size_t size);
+  void decodeMsopPktImu(const uint8_t *pkt, size_t size);
+  bool decodeMsopPktSerialPointCloud(const uint8_t *pkt, size_t size);
+  bool decodeMsopPktFilterSerialPointCloud(uint8_t id, const uint8_t *pkt, size_t size);
+  void decodeMsopPktFaultCode(const uint8_t *pkt, size_t size);
+  virtual void processDifopPkt(std::shared_ptr<ProtocolBase> protocol);
+  virtual ~DecoderVanjee722D() = default;
+  explicit DecoderVanjee722D(const WJDecoderParam &param);
+
+  void SendSerialImuData(Vanjee722dSerialImu difop, double timestamp, double lidar_timestamp);
+};
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::initLdLuminousMoment() {
+  all_points_luminous_moment_serial_.resize(1);
+  all_points_luminous_moment_serial_[0].resize(19200);
+  for (uint16_t col = 0; col < 1200; col++) {
+    for (uint8_t row = 0; row < 16; row++) {
+      all_points_luminous_moment_serial_[0][col * 16 + row] = col * luminous_period_of_ld_ + row * luminous_period_of_adjacent_ld_;
+    }
+  }
+}
+
+template <typename T_PointCloud>
+inline WJDecoderConstParam &DecoderVanjee722D<T_PointCloud>::getConstParam() {
+  static WJDecoderConstParam param = {16, 0.002f};
+  return param;
+}
+
+template <typename T_PointCloud>
+inline DecoderVanjee722D<T_PointCloud>::DecoderVanjee722D(const WJDecoderParam &param)
+    : Decoder<T_PointCloud>(getConstParam(), param), chan_angles_(this->const_param_.chan_num) {
+  if (param.max_distance < param.min_distance)
+    WJ_WARNING << "config params (max distance < min distance)!" << WJ_REND;
+
+  publish_mode_ = param.publish_mode;
+  this->packet_duration_ = FRAME_DURATION / SINGLE_PKT_NUM;
+  split_strategy_ = std::make_shared<SplitStrategyByAngle>(0);
+  this->m_imu_params_get_ = std::make_shared<ImuParamGet>(270, param.transform_param);
+
+  this->start_angle_ = this->param_.start_angle * 1000;
+  this->end_angle_ = this->param_.end_angle * 1000;
+
+  if (this->param_.config_from_file) {
+    chan_angles_.loadFromFile(this->param_.angle_path_ver);
+  }
+  initLdLuminousMoment();
+}
+
+template <typename T_PointCloud>
+inline bool DecoderVanjee722D<T_PointCloud>::dataParsing(uint8_t id, std::vector<uint8_t> &buf_cache, const uint8_t *pkt, size_t size) {
+  bool ret = false;
+  std::vector<uint8_t> data;
+  if (buf_cache.size() > 0) {
+    std::copy(buf_cache.begin(), buf_cache.end(), std::back_inserter(data));
+    std::copy(pkt, pkt + size, std::back_inserter(data));
+  } else {
+    std::copy(pkt, pkt + size, std::back_inserter(data));
+  }
+
+  buf_cache.clear();
+  buf_cache.shrink_to_fit();
+
+  uint32 index_last = 0;
+  for (size_t i = 0; i < data.size(); i++) {
+    if (data.size() - i < 34) {
+      index_last = i;
+      break;
+    }
+
+    if (data[i] != 0xee || (data[i + 1] != 0xff && data[i + 1] != 0xdd)) {
+      index_last = i + 1;
+      continue;
+    }
+
+    if (data[i + 1] == 0xff) {
+      if (data[i + 5] == 0) {
+        if (data.size() - i < 80) {
+          index_last = i;
+          break;
+        } else {
+          uint32_t crc_check_80 = this->crc32Mpeg2Padded(&data[i], 76);
+          uint32_t crc_pkg_80 = data[i + 76] | (data[i + 77] << 8) | (data[i + 78] << 16) | (data[i + 79] << 24);
+          if (crc_check_80 == crc_pkg_80) {
+            if (decodeMsopPktFilterSerialPointCloud(id, &data[i], 80)) {
+              ret = true;
+              index_last = i + 80;
+              break;
+            } else {
+              i += 80 - 1;
+              index_last = i + 1;
+              continue;
+            }
+          } else {
+            index_last = i + 1;
+            break;
+          }
+        }
+      } else if (data[i + 5] == 1) {
+        uint32_t crc_check_34 = this->crc32Mpeg2Padded(&data[i], 30);
+        uint32_t crc_pkg_34 = data[i + 30] | (data[i + 31] << 8) | (data[i + 32] << 16) | (data[i + 33] << 24);
+        if (crc_check_34 == crc_pkg_34) {
+          decodeMsopPktImu(&data[i], 34);
+          i += 34 - 1;
+          index_last = i + 1;
+          continue;
+        } else {
+          index_last = i + 1;
+        }
+      } else {
+        index_last = i + 1;
+      }
+    } else {
+      if (data.size() - i < 41) {
+        index_last = i;
+        break;
+      } else {
+        uint32_t crc_check_41 = this->crc32Mpeg2Padded(&data[i + 13], 24);
+        uint32_t crc_pkg_41 = data[i + 37] | (data[i + 38] << 8) | (data[i + 39] << 16) | (data[i + 40] << 24);
+        if (crc_check_41 == crc_pkg_41) {
+          decodeMsopPktFaultCode(&data[i], 41);
+          i += 41 - 1;
+          index_last = i + 1;
+          continue;
+        } else {
+          index_last = i + 1;
+          break;
+        }
+      }
+    }
+    index_last = i + 1;
+  }
+
+  if (index_last < data.size()) {
+    buf_cache.assign(data.begin() + index_last, data.end());
+  }
+
+  return ret;
+}
+
+template <typename T_PointCloud>
+inline bool DecoderVanjee722D<T_PointCloud>::decodeMsopPkt(const uint8_t *pkt, size_t size) {
+  if (size > 5 && pkt[0] == 0xF0 && pkt[4] == 0xE0 && pkt[3] == 0x01) {
+    return dataParsing(1, buf_cache_2_, pkt + 5, size - 5);
+  } else {
+    return dataParsing(0, buf_cache_1_, pkt, size);
+  }
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::decodeMsopPktFaultCode(const uint8_t *pkt, size_t size) {
+  if ((!this->param_.device_ctrl_state_enable && !this->param_.send_lidar_param_enable) || size != sizeof(Vanjee722dSerialFaultCodeMsopPkt))
+    return;
+
+  double pkt_ts = 0;
+  double pkt_host_ts = 0;
+  double pkt_lidar_ts = 0;
+  pkt_host_ts = getTimeHost() * 1e-6;
+
+  auto &packet = *(Vanjee722dSerialFaultCodeMsopPkt *)pkt;
+
+  WJTimestampYMD tm{
+      (int32_t)(packet.datetime[0]), packet.datetime[1], packet.datetime[2], packet.datetime[3], packet.datetime[4], packet.datetime[5]};
+  double usec = (packet.timestamp[0] + (packet.timestamp[1] << 8) + (packet.timestamp[2] << 16) + (packet.timestamp[3] << 24)) * 1e-6;
+  pkt_lidar_ts = parseTimeYMD(&tm) * 1e-6 + usec;
+
+  if (!this->param_.use_lidar_clock)
+    pkt_ts = pkt_host_ts;
+  else
+    pkt_ts = pkt_lidar_ts;
+
+  uint8_t frame_id = packet.state_and_counter & 0x07;
+  uint32_t loss_packets_num = (frame_id + 8 - pre_fault_code_frame_id_) % 8;
+  if (loss_packets_num > 1 && pre_fault_code_frame_id_ >= 0) {
+    WJ_WARNING << "fault code: loss " << (loss_packets_num - 1) << " packets" << WJ_REND;
+  }
+  if (frame_id == pre_fault_code_frame_id_) {
+    WJ_WARNING << "fault code: loss " << 7 << " packets" << WJ_REND;
+  }
+  pre_fault_code_frame_id_ = frame_id;
+
+  uint8_t lidar_state = (packet.state_and_counter >> 5) & 0x07;
+  if (lidar_state == 1 || lidar_state == 2) {
+    this->deviceStatePublish(0, packet.fault_code, lidar_state, pkt_ts);
+  }
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::decodeMsopPktImu(const uint8_t *pkt, size_t size) {
+  if (this->param_.imu_enable == -1 || size != sizeof(Vanjee722dSerialImuMsopPkt))
+    return;
+
+  double pkt_ts = 0;
+  double pkt_host_ts = 0;
+  double pkt_lidar_ts = 0;
+
+  pkt_host_ts = getTimeHost() * 1e-6;
+
+  auto &packet = *(Vanjee722dSerialImuMsopPkt *)pkt;
+
+  WJTimestampYMD tm{
+      (int32_t)(packet.datetime[0]), packet.datetime[1], packet.datetime[2], packet.datetime[3], packet.datetime[4], packet.datetime[5]};
+  double usec = (packet.timestamp[0] + (packet.timestamp[1] << 8) + (packet.timestamp[2] << 16) + (packet.timestamp[3] << 24)) * 1e-6;
+  pkt_lidar_ts = parseTimeYMD(&tm) * 1e-6 + usec;
+
+  if (!this->param_.use_lidar_clock)
+    pkt_ts = pkt_host_ts;
+  else
+    pkt_ts = pkt_lidar_ts;
+
+  uint32_t loss_packets_num = (packet.blocks.sequence_num + 65536 - pre_imu_frame_id_) % 65536;
+  if (loss_packets_num > 1 && pre_imu_frame_id_ >= 0)
+    WJ_WARNING << "imu: loss " << (loss_packets_num - 1) << " packets" << WJ_REND;
+  pre_imu_frame_id_ = packet.blocks.sequence_num;
+
+  if (pkt_lidar_ts != this->prev_pkt_ts_) {
+    SendSerialImuData(packet.blocks, pkt_ts, pkt_lidar_ts);
+  }
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::lidarFormatParameterPublish(double pkt_ts, double pkt_host_ts) {
+  this->mtx_lidar_param_.lock();
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::work_mode) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::work_mode);
+    if (get_lidar_param_msg.cmd_type == 1) {
+      uint8_t work_mode = 0xff;
+      JsonParser parser(get_lidar_param_msg.data);
+      auto json_value = parser.parse();
+      if (auto obj = std::dynamic_pointer_cast<JsonObject>(json_value)) {
+        if (obj->has("work_mode")) {
+          auto result = std::dynamic_pointer_cast<JsonNumber>(obj->get("work_mode"));
+          if (result == nullptr || result->value() > 1) {
+            WJ_WARNING << "Invalid work mode parameter (0-1)." << WJ_REND;
+            return;
+          }
+          work_mode = static_cast<uint8_t>(result->value());
+        }
+      }
+      if (work_mode > 1) {
+        WJ_WARNING << "Invalid work mode parameter (0-1)." << WJ_REND;
+        return;
+      }
+      std::shared_ptr<Params_WorkModeSet722D> param = std::shared_ptr<Params_WorkModeSet722D>(new Params_WorkModeSet722D());
+      param->work_mode_ = work_mode == 1 ? 0 : 1;
+      GetDifoCtrlClass difop_work_mode(*(std::make_shared<Protocol_WorkModeSet722D>(param)->SetRequest()), false, 1000);
+
+      uint16_t cmd = CmdRepository722D::CreateInstance()->sp_set_work_mode_->GetCmdKey();
+      auto it = (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).find(cmd);
+      if (it != (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).end()) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[cmd] = difop_work_mode;
+      } else {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).emplace(cmd, difop_work_mode);
+      }
+    } else {
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_get_work_mode_->GetCmdKey()].setStopFlag(false);
+    }
+    this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::temperature) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::temperature);
+    if (get_lidar_param_msg.cmd_type == 0) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = get_lidar_param_msg.cmd_id;
+      lidar_param.cmd_type = get_lidar_param_msg.cmd_type;
+      lidar_param.repeat_interval = get_lidar_param_msg.repeat_interval;
+      this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+      if (get_lidar_param_msg.repeat_interval == 0) {
+        this->lidarParameterPublish(lidar_param, pkt_ts);
+        this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+      } else {
+        if (pre_temperature_data_publish_ts_ == 0) {
+          pre_temperature_data_publish_ts_ = pkt_host_ts;
+          this->lidarParameterPublish(lidar_param, pkt_ts);
+        } else {
+          if ((pkt_host_ts - pre_temperature_data_publish_ts_) > get_lidar_param_msg.repeat_interval * 1e-3) {
+            pre_temperature_data_publish_ts_ = pkt_host_ts;
+            this->lidarParameterPublish(lidar_param, pkt_ts);
+          } else if (pkt_host_ts < pre_temperature_data_publish_ts_) {
+            pre_temperature_data_publish_ts_ = pkt_host_ts;
+          }
+        }
+      }
+    } else {
+      this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+    }
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::firmware_version) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::firmware_version);
+    if (get_lidar_param_msg.cmd_type == 0) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = get_lidar_param_msg.cmd_id;
+      lidar_param.cmd_type = get_lidar_param_msg.cmd_type;
+      lidar_param.repeat_interval = 0;
+      this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+      this->lidarParameterPublish(lidar_param, pkt_ts);
+    }
+    this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::sn) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::sn);
+    if (get_lidar_param_msg.cmd_type == 0) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = get_lidar_param_msg.cmd_id;
+      lidar_param.cmd_type = get_lidar_param_msg.cmd_type;
+      lidar_param.repeat_interval = 0;
+      this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+      this->lidarParameterPublish(lidar_param, pkt_ts);
+    }
+    this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::acceleration) > 0) {
+    if (acceleration_protocol_flag) {
+      LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::acceleration);
+      if (get_lidar_param_msg.cmd_type == 0) {
+        LidarParameterInterface lidar_param;
+        lidar_param.cmd_id = get_lidar_param_msg.cmd_id;
+        lidar_param.cmd_type = get_lidar_param_msg.cmd_type;
+        lidar_param.repeat_interval = 0;
+        this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+        this->lidarParameterPublish(lidar_param, pkt_ts);
+      } else if (get_lidar_param_msg.cmd_type == 1) {
+        uint8_t state = 0xff;
+        JsonParser parser(get_lidar_param_msg.data);
+        auto json_value = parser.parse();
+        if (auto obj = std::dynamic_pointer_cast<JsonObject>(json_value)) {
+          if (obj->has("acceleration_range")) {
+            auto result = std::dynamic_pointer_cast<JsonNumber>(obj->get("acceleration_range"));
+            if (result != nullptr && result->value() <= 1) {
+              state = static_cast<uint8_t>(result->value());
+            }
+          }
+        }
+        if (state <= 1) {
+          std::shared_ptr<Params_AccelerationRangeSet722D> param =
+              std::shared_ptr<Params_AccelerationRangeSet722D>(new Params_AccelerationRangeSet722D());
+          param->state_ = state;
+          GetDifoCtrlClass param_set(*(std::make_shared<Protocol_AccelerationRangeSet722D>(param)->SetRequest()), false);
+
+          uint16_t cmd = CmdRepository722D::CreateInstance()->sp_acceleration_range_set_->GetCmdKey();
+          auto it = (*(this->get_difo_ctrl_map_ptr_)).find(cmd);
+          if (it != (*(this->get_difo_ctrl_map_ptr_)).end()) {
+            (*(this->get_difo_ctrl_map_ptr_))[cmd] = param_set;
+          } else {
+            (*(this->get_difo_ctrl_map_ptr_)).emplace(cmd, param_set);
+          }
+        } else {
+          WJ_WARNING << "Invalid acceleration range parameter (0-1)." << WJ_REND;
+        }
+      } else {
+        ;
+      }
+    } else {
+      WJ_WARNING << "This firmware version does not support the acceleration range query and setting functions." << WJ_REND;
+    }
+    this->get_lidar_param_msg_.erase((uint16_t)LidarParam::acceleration);
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::flash_opt) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::flash_opt);
+    if (get_lidar_param_msg.cmd_type == 1) {
+      std::vector<uint8_t> input_data;
+      JsonParser parser(get_lidar_param_msg.data);
+      auto json_value = parser.parse();
+      if (auto obj = std::dynamic_pointer_cast<JsonObject>(json_value)) {
+        if (obj->has("data")) {
+          auto result = std::dynamic_pointer_cast<JsonArray>(obj->get("data"));
+          if (result == nullptr || result->size() != 100) {
+            WJ_WARNING << "Invalid flash data parameter." << WJ_REND;
+            return;
+          }
+          for (uint32_t i = 0; i < result->size(); i++) {
+            input_data.emplace_back(static_cast<uint8_t>(std::dynamic_pointer_cast<JsonNumber>(result->get(i))->value()));
+          }
+        }
+      }
+      if (input_data.size() != 100) {
+        WJ_WARNING << "Invalid flash data parameter." << WJ_REND;
+        return;
+      }
+      std::shared_ptr<Params_FlashDataSet722D> param = std::shared_ptr<Params_FlashDataSet722D>(new Params_FlashDataSet722D());
+      param->data_.resize(input_data.size());
+      memcpy(param->data_.data(), input_data.data(), input_data.size() * sizeof(uint8_t));
+      GetDifoCtrlClass difop_flash_data(*(std::make_shared<Protocol_FlashDataSet722D>(param)->SetRequest()), false, 1000);
+
+      uint16_t cmd = CmdRepository722D::CreateInstance()->sp_set_flash_data_->GetCmdKey();
+      auto it = (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).find(cmd);
+      if (it != (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).end()) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[cmd] = difop_flash_data;
+      } else {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_)).emplace(cmd, difop_flash_data);
+      }
+    } else {
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_get_flash_data_->GetCmdKey()].setStopFlag(false);
+    }
+    this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+  }
+
+  if (this->get_lidar_param_msg_.count((uint16_t)LidarParam::light_opt) > 0) {
+    LidarParameterInterface get_lidar_param_msg = this->get_lidar_param_msg_.at((uint16_t)LidarParam::light_opt);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_ld_enable_->GetCmdKey()].setStopFlag(false);
+    this->get_lidar_param_msg_.erase(get_lidar_param_msg.cmd_id);
+  }
+
+  this->mtx_lidar_param_.unlock();
+}
+
+template <typename T_PointCloud>
+int32_t DecoderVanjee722D<T_PointCloud>::checkResolution(int32_t resolution, Vanjee722dResolutionState &state) {
+  if (resolution != 30 && resolution != 60 && resolution != 120) {
+    return -1;
+  }
+
+  if (state.non_negative_result_flag) {
+    if (resolution == state.last_value) {
+      if (resolution == 30) {
+        state.count_30++;
+        state.count_60 = 0;
+        state.count_120 = 0;
+      } else if (resolution == 60) {
+        state.count_60++;
+        state.count_30 = 0;
+        state.count_120 = 0;
+      } else {
+        state.count_120++;
+        state.count_30 = 0;
+        state.count_60 = 0;
+      }
+    } else {
+      state.count_30 = (resolution == 30) ? 1 : 0;
+      state.count_60 = (resolution == 60) ? 1 : 0;
+      state.count_120 = (resolution == 120) ? 1 : 0;
+      state.last_value = resolution;
+    }
+
+    if ((state.last_non_negative_result != 0 && state.count_60 >= 300) || (state.last_non_negative_result != 1 && state.count_120 >= 300) ||
+        (state.last_non_negative_result != 2 && state.count_30 >= 300)) {
+      if (state.count_30 >= 300) {
+        state.paramInit(true, 2);
+      } else if (state.count_60 >= 300) {
+        state.paramInit(true, 0);
+      } else {
+        state.paramInit(true, 1);
+      }
+      return state.last_non_negative_result;
+    }
+
+    return state.last_non_negative_result;
+  }
+
+  if (resolution == state.last_value) {
+    if (resolution == 30) {
+      state.count_30++;
+      state.count_60 = 0;
+      state.count_120 = 0;
+    } else if (resolution == 60) {
+      state.count_60++;
+      state.count_30 = 0;
+      state.count_120 = 0;
+    } else {
+      state.count_120++;
+      state.count_30 = 0;
+      state.count_60 = 0;
+    }
+  } else {
+    state.count_30 = (resolution == 30) ? 1 : 0;
+    state.count_60 = (resolution == 60) ? 1 : 0;
+    state.count_120 = (resolution == 120) ? 1 : 0;
+    state.last_value = resolution;
+  }
+
+  if (state.count_60 >= 300) {
+    state.paramInit(true, 0);
+    return 0;
+  }
+
+  if (state.count_120 >= 300) {
+    state.paramInit(true, 1);
+    return 1;
+  }
+
+  if (state.count_30 >= 300) {
+    state.paramInit(true, 2);
+    return 2;
+  }
+
+  return -1;
+}
+
+template <typename T_PointCloud>
+bool DecoderVanjee722D<T_PointCloud>::decodeMsopPktFilterSerialPointCloud(uint8_t id, const uint8_t *pkt, size_t size) {
+  if (!this->param_.point_cloud_enable || size != sizeof(Vanjee722dSerialPointCloudMsopPkt))
+    return false;
+
+  bool ret = false;
+  auto &packet = *(Vanjee722dSerialPointCloudMsopPkt *)pkt;
+  uint16_t cur_pkt_id = packet.blocks.sequence_num;
+
+  if (((id == 0) && (cur_pkt_id % 2 != 0)) || ((id == 1) && (cur_pkt_id % 2 != 1))) {
+    return false;
+  }
+
+  if (!has_started_) {
+    next_expected_seq_ = cur_pkt_id;
+    has_started_ = true;
+  }
+
+  uint16_t gap_from_expected = static_cast<uint16_t>(cur_pkt_id - next_expected_seq_);
+  if (gap_from_expected > 32768) {
+    const uint16_t behind = static_cast<uint16_t>(65536u - gap_from_expected);
+    if (behind <= 3600) {
+      return false;
+    }
+    cloud_pkt_map_ptr_.clear();
+    this->point_cloud_->points.clear();
+    next_expected_seq_ = cur_pkt_id;
+  } else if (gap_from_expected > 3600) {
+    cloud_pkt_map_ptr_.clear();
+    this->point_cloud_->points.clear();
+    next_expected_seq_ = cur_pkt_id;
+  }
+
+  for (auto it = cloud_pkt_map_ptr_.begin(); it != cloud_pkt_map_ptr_.end();) {
+    uint16_t gap = static_cast<uint16_t>(it->first - next_expected_seq_);
+    if (gap > 32768) {
+      it = cloud_pkt_map_ptr_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
+  cloud_pkt_map_ptr_[cur_pkt_id] = std::vector<uint8_t>(pkt, pkt + size);
+
+  auto flush_cached_packets = [&]() {
+    if (cloud_pkt_map_ptr_.empty()) {
+      return;
+    }
+    const bool wrap_around = (std::prev(cloud_pkt_map_ptr_.end())->first - cloud_pkt_map_ptr_.begin()->first) > 32768;
+    if (wrap_around) {
+      for (auto it = cloud_pkt_map_ptr_.begin(); it != cloud_pkt_map_ptr_.end();) {
+        if (it->first > 32768) {
+          ret = decodeMsopPktSerialPointCloud(it->second.data(), it->second.size());
+          next_expected_seq_ = static_cast<uint16_t>(it->first + 1);
+          it = cloud_pkt_map_ptr_.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+    for (auto it = cloud_pkt_map_ptr_.begin(); it != cloud_pkt_map_ptr_.end();) {
+      ret = decodeMsopPktSerialPointCloud(it->second.data(), it->second.size());
+      next_expected_seq_ = static_cast<uint16_t>(it->first + 1);
+      it = cloud_pkt_map_ptr_.erase(it);
+    }
+  };
+
+  if (cloud_pkt_map_ptr_.size() >= cache_size_) {
+    flush_cached_packets();
+  }
+
+  if (cloud_pkt_map_ptr_.find(next_expected_seq_) == cloud_pkt_map_ptr_.end()) {
+    const uint16_t expect_parity = next_expected_seq_ % 2;
+    const uint16_t window = static_cast<uint16_t>(cache_size_ * 2);
+    for (auto it = cloud_pkt_map_ptr_.begin(); it != cloud_pkt_map_ptr_.end(); ++it) {
+      if ((it->first % 2) != expect_parity) {
+        continue;
+      }
+      uint16_t gap = static_cast<uint16_t>(it->first - next_expected_seq_);
+      if (gap > 0 && gap < window) {
+        next_expected_seq_ = it->first;
+        break;
+      }
+    }
+  }
+
+  auto it_expect = cloud_pkt_map_ptr_.find(next_expected_seq_);
+  while (it_expect != cloud_pkt_map_ptr_.end()) {
+    ret = decodeMsopPktSerialPointCloud(it_expect->second.data(), it_expect->second.size());
+    cloud_pkt_map_ptr_.erase(it_expect);
+    next_expected_seq_ = static_cast<uint16_t>(next_expected_seq_ + 1);
+    it_expect = cloud_pkt_map_ptr_.find(next_expected_seq_);
+  }
+
+  return ret;
+}
+
+template <typename T_PointCloud>
+bool DecoderVanjee722D<T_PointCloud>::decodeMsopPktSerialPointCloud(const uint8_t *pkt, size_t size) {
+  if (!this->param_.point_cloud_enable || size != sizeof(Vanjee722dSerialPointCloudMsopPkt))
+    return false;
+
+  bool ret = false;
+  double pkt_ts = 0;
+  double pkt_host_ts = 0;
+  double pkt_lidar_ts = 0;
+
+  pkt_host_ts = getTimeHost() * 1e-6;
+
+  auto &packet = *(Vanjee722dSerialPointCloudMsopPkt *)pkt;
+
+  WJTimestampYMD tm{
+      (int32_t)(packet.datetime[0]), packet.datetime[1], packet.datetime[2], packet.datetime[3], packet.datetime[4], packet.datetime[5]};
+  double usec = (packet.timestamp[0] + (packet.timestamp[1] << 8) + (packet.timestamp[2] << 16) + (packet.timestamp[3] << 24)) * 1e-6;
+  pkt_lidar_ts = parseTimeYMD(&tm) * 1e-6 + usec;
+
+  if (!this->param_.use_lidar_clock)
+    pkt_ts = pkt_host_ts;
+  else
+    pkt_ts = pkt_lidar_ts;
+
+  uint32_t loss_packets_num = (packet.blocks.sequence_num + 65536 - pre_point_cloud_frame_id_) % 65536;
+  if (loss_packets_num > 1 && pre_point_cloud_frame_id_ >= 0)
+    WJ_WARNING << "point cloud: loss " << (loss_packets_num - 1) << " packets" << WJ_REND;
+  pre_point_cloud_frame_id_ = packet.blocks.sequence_num;
+
+  if (packet.blocks.reserved_id == 0x02) {
+    lidar_temperature_ = packet.blocks.reserved_info;
+    if (get_lidar_param_.count((uint16_t)LidarParam::temperature) > 0) {
+      get_lidar_param_[(uint16_t)LidarParam::temperature] = std::to_string(lidar_temperature_ * 1e-2);
+    } else {
+      get_lidar_param_.emplace((uint16_t)LidarParam::temperature, std::to_string(lidar_temperature_ * 1e-2));
+    }
+  }
+
+  lidarFormatParameterPublish(pkt_ts, pkt_host_ts);
+
+  if (pkt_host_ts - temperature_update_ts_ > 30) {
+    temperature_update_ts_ = pkt_host_ts;
+    if (lidar_temperature_ > -27315) {
+      WJ_INFOL << "Temperature: " << (double)lidar_temperature_ * 1e-2 << " °C" << WJ_REND;
+      if (this->param_.device_ctrl_state_enable) {
+        this->device_ctrl_->cmd_id = 2;
+        this->device_ctrl_->cmd_param = (uint16_t)lidar_temperature_;
+        this->device_ctrl_->cmd_state = 1;
+        this->cb_device_ctrl_state_(pkt_ts);
+      }
+    }
+  } else if (temperature_update_ts_ - pkt_host_ts > 30) {
+    temperature_update_ts_ = pkt_host_ts;
+    WJ_WARNING << "Server time update, temperature param publish delayed" << WJ_REND;
+  }
+
+  int32_t resolution = 30;
+  uint8_t resolution_index = 0;
+#if false
+  if (pre_hor_angle_ == -1) {
+    pre_hor_angle_ = packet.blocks.azimuth % 36000;
+    return false;
+  } else {
+    if (loss_packets_num >= 300 || loss_packets_num == 0) {
+      pre_hor_angle_ = packet.blocks.azimuth % 36000;
+      return false;
+    }
+    resolution = ((packet.blocks.azimuth + 36000 - pre_hor_angle_) % 36000) / loss_packets_num;
+    if (resolution == 0) {
+      pre_hor_angle_ = packet.blocks.azimuth % 36000;
+      return false;
+    } else if (resolution < 45) {
+      resolution = 30;
+      resolution_index = 2;
+    } else if (resolution < 90) {
+      resolution = 60;
+      resolution_index = 0;
+    } else {
+      resolution = 120;
+      resolution_index = 1;
+    }
+
+    int32_t ret_resolution = checkResolution(resolution, resolution_state_);
+    if (ret_resolution == 0) {
+      resolution = 60;
+      resolution_index = 0;
+    } else if (ret_resolution == 1) {
+      resolution = 120;
+      resolution_index = 1;
+    } else if (ret_resolution == 2) {
+      resolution = 30;
+      resolution_index = 2;
+    } else {
+      ;
+    }
+  }
+#endif
+  const Vanjee722dSerialPointCloud &block = packet.blocks;
+  int32_t azimuth = block.azimuth % 36000;
+  int32_t azimuth_trans = (block.azimuth + resolution) % 36000;
+
+  if (this->split_strategy_->newBlock(azimuth_trans) && azimuth_trans >= resolution && this->point_cloud_->points.size() > 0) {
+    getTimestamp(this->point_cloud_->points[0], this->first_point_ts_);
+    getTimestamp(this->point_cloud_->points[this->point_cloud_->points.size() - 1], this->last_point_ts_);
+    if (this->first_point_ts_ > 0.0) {
+      double timestamp = 0;
+      if (this->param_.ts_first_point == true) {
+        for (auto &pt : this->point_cloud_->points) {
+          getTimestamp(pt, timestamp);
+          setTimestamp(pt, timestamp - this->first_point_ts_);
+        }
+      } else {
+        for (auto &pt : this->point_cloud_->points) {
+          getTimestamp(pt, timestamp);
+          setTimestamp(pt, timestamp - this->last_point_ts_);
+        }
+      }
+      this->cb_split_frame_(16, this->cloudTs());
+    } else {
+      this->point_cloud_->points.clear();
+    }
+    ret = true;
+  }
+
+  double timestamp_point;
+  uint32_t cur_blk_first_point_id = azimuth / resolution * 16;
+  uint32_t change_index = 15;
+  for (uint16_t chan = 15; chan > 0; chan--) {
+    if (block.channel[chan].distance != 0) {
+      break;
+    }
+    change_index--;
+  }
+
+  for (uint16_t chan = 0; chan < 16; chan++) {
+    uint8_t tag = (uint8_t)((block.dirty_degree & (0x00000003 << (chan * 2))) >> (chan * 2));
+    float x, y, z, xy;
+
+    uint32_t point_id = cur_blk_first_point_id + chan;
+    if (change_index == 15) {
+      timestamp_point = pkt_ts - all_points_luminous_moment_serial_[resolution_index][15 - chan];
+    } else {
+      if (chan <= change_index) {
+        timestamp_point = pkt_ts - all_points_luminous_moment_serial_[resolution_index][change_index - chan];
+      } else {
+        timestamp_point = pkt_ts;
+      }
+    }
+
+    const Vanjee722dSerialBlockChannel &channel = block.channel[chan];
+
+    float distance = channel.distance * this->const_param_.distance_res;
+    int32_t angle_vert = chan_angles_.vertAdjust(chan);
+    int32_t angle_horiz = (chan_angles_.horizAdjust(chan, azimuth * 10) + 630000) % 360000;
+
+    if (this->distance_section_.in(distance)) {
+      int32_t optcent_2_lidar_angle_hor = (azimuth * 10 + optcent_2_lidar_arg_ + 630000) % 360000;
+      CenterCompensationParams optical_center_compensation_param;
+      this->calcOpticalCenterCompensation(optical_center_compensation_param, optcent_2_lidar_angle_hor, optcent_2_lidar_l_, optcent_2_lidar_z_);
+
+      xy = distance * COS(angle_vert);
+      x = xy * SIN(angle_horiz) + optical_center_compensation_param.x;
+      y = xy * COS(angle_horiz) + optical_center_compensation_param.y;
+      z = distance * SIN(angle_vert) + optical_center_compensation_param.z;
+      uint32_t angle_horiz_mask = (450000 - angle_horiz) % 360000;
+#ifdef ENABLE_GTEST
+      distance = std::pow(x * x + y * y + z * z, 0.5);
+      angle_horiz_mask = this->coordTransAzimuth(x, y, 1);
+#endif
+      if (this->start_angle_ < this->end_angle_) {
+        if (angle_horiz_mask < this->start_angle_ || angle_horiz_mask > this->end_angle_) {
+          distance = 0;
+        }
+      } else {
+        if (angle_horiz_mask > this->end_angle_ && angle_horiz_mask < this->start_angle_) {
+          distance = 0;
+        }
+      }
+
+      if (this->hide_range_params_.size() > 0 && distance != 0 &&
+          this->isValueInRange(chan + this->first_line_id_, angle_horiz_mask / 1000.0, distance, this->hide_range_params_)) {
+        distance = 0;
+      }
+    }
+
+    if (this->distance_section_.in(distance)) {
+      this->transformPoint(x, y, z);
+
+      typename T_PointCloud::PointT point;
+      setX(point, x);
+      setY(point, y);
+      setZ(point, z);
+      setIntensity(point, channel.reflectivity);
+      setTimestamp(point, timestamp_point);
+      setRing(point, chan + this->first_line_id_);
+      setTag(point, tag);
+#ifdef ENABLE_GTEST
+      setPointId(point, point_id);
+      setHorAngle(point, angle_horiz / 1000.0);
+      setVerAngle(point, angle_vert / 1000.0);
+      setDistance(point, distance);
+#endif
+      this->point_cloud_->points.emplace_back(point);
+    } else {
+      typename T_PointCloud::PointT point;
+      if (!this->param_.dense_points) {
+        setX(point, NAN);
+        setY(point, NAN);
+        setZ(point, NAN);
+      } else {
+        setX(point, 0);
+        setY(point, 0);
+        setZ(point, 0);
+      }
+      setIntensity(point, 0);
+      setTimestamp(point, timestamp_point);
+      setRing(point, chan + this->first_line_id_);
+      setTag(point, tag);
+#ifdef ENABLE_GTEST
+      setPointId(point, point_id);
+      setHorAngle(point, angle_horiz / 1000.0);
+      setVerAngle(point, angle_vert / 1000.0);
+      setDistance(point, distance);
+#endif
+      this->point_cloud_->points.emplace_back(point);
+    }
+  }
+
+  if (azimuth_trans < resolution) {
+    if (((pre_hor_angle_ + resolution) % 36000) < resolution) {
+      this->point_cloud_->points.clear();
+    } else {
+      getTimestamp(this->point_cloud_->points[0], this->first_point_ts_);
+      getTimestamp(this->point_cloud_->points[this->point_cloud_->points.size() - 1], this->last_point_ts_);
+      if (this->first_point_ts_ > 0.0) {
+        double timestamp = 0;
+        if (this->param_.ts_first_point == true) {
+          for (auto &pt : this->point_cloud_->points) {
+            getTimestamp(pt, timestamp);
+            setTimestamp(pt, timestamp - this->first_point_ts_);
+          }
+        } else {
+          for (auto &pt : this->point_cloud_->points) {
+            getTimestamp(pt, timestamp);
+            setTimestamp(pt, timestamp - this->last_point_ts_);
+          }
+        }
+        this->cb_split_frame_(16, this->cloudTs());
+      } else {
+        this->point_cloud_->points.clear();
+      }
+      ret = true;
+    }
+  }
+  this->last_point_ts_ = pkt_ts;
+  pre_hor_angle_ = azimuth;
+  this->prev_pkt_ts_ = pkt_lidar_ts;
+  return ret;
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::SendSerialImuData(Vanjee722dSerialImu difop, double timestamp, double lidar_timestamp) {
+  double imu_angle_voc_x = difop.imu_angle_voc_x / 32.8 * 0.0174533;
+  double imu_angle_voc_y = difop.imu_angle_voc_y / 32.8 * 0.0174533;
+  double imu_angle_voc_z = difop.imu_angle_voc_z / 32.8 * 0.0174533;
+
+  double imu_linear_acce_x = difop.imu_linear_acce_x / 8192.0 * 9.81;
+  double imu_linear_acce_y = difop.imu_linear_acce_y / 8192.0 * 9.81;
+  double imu_linear_acce_z = difop.imu_linear_acce_z / 8192.0 * 9.81;
+
+  this->m_imu_params_get_->rotateImu(imu_linear_acce_x, imu_linear_acce_y, imu_linear_acce_z, imu_angle_voc_x, imu_angle_voc_y, imu_angle_voc_z);
+#ifdef ENABLE_TRANSFORM
+  this->m_imu_params_get_->imuTransform(imu_linear_acce_x, imu_linear_acce_y, imu_linear_acce_z, imu_angle_voc_x, imu_angle_voc_y, imu_angle_voc_z);
+#endif
+  this->imu_packet_->timestamp = timestamp;
+  this->imu_packet_->angular_voc[0] = imu_angle_voc_x;
+  this->imu_packet_->angular_voc[1] = imu_angle_voc_y;
+  this->imu_packet_->angular_voc[2] = imu_angle_voc_z;
+
+  this->imu_packet_->linear_acce[0] = imu_linear_acce_x;
+  this->imu_packet_->linear_acce[1] = imu_linear_acce_y;
+  this->imu_packet_->linear_acce[2] = imu_linear_acce_z;
+
+  this->imu_packet_->orientation[0] = 0;
+  this->imu_packet_->orientation[1] = 0;
+  this->imu_packet_->orientation[2] = 0;
+  this->imu_packet_->orientation[3] = 0;
+
+  this->cb_imu_pkt_();
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::setScanDataState(bool state) {
+  if (scan_data_state_set_flag_) {
+    std::shared_ptr<Params_ScanDataStateSet722D> params_ScanDataStateSet =
+        std::shared_ptr<Params_ScanDataStateSet722D>(new Params_ScanDataStateSet722D());
+    if (state) {
+      params_ScanDataStateSet->state_ = 0;
+    } else {
+      params_ScanDataStateSet->state_ = 1;
+    }
+    GetDifoCtrlClass getDifoCtrlData_ScanDataStateSet(*(std::make_shared<Protocol_ScanDataStateSet722D>(params_ScanDataStateSet)->SetRequest()),
+                                                      false, 100);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_scan_data_state_set_->GetCmdKey()] =
+        getDifoCtrlData_ScanDataStateSet;
+    scan_data_state_set_flag_ = false;
+  }
+}
+
+template <typename T_PointCloud>
+void DecoderVanjee722D<T_PointCloud>::processDifopPkt(std::shared_ptr<ProtocolBase> protocol) {
+  std::shared_ptr<ProtocolAbstract722D> p;
+  std::shared_ptr<CmdClass> sp_cmd = std::make_shared<CmdClass>(protocol->MainCmd, protocol->SubCmd);
+
+  if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_ld_value_get_)) {
+    p = std::make_shared<Protocol_LDValueGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_firmware_version_get_)) {
+    p = std::make_shared<Protocol_FirmwareVersionGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_sn_get_)) {
+    p = std::make_shared<Protocol_SnGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_scan_data_state_set_)) {
+    p = std::make_shared<Protocol_ScanDataStateSet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_acceleration_range_get_)) {
+    p = std::make_shared<Protocol_AccelerationRangeGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_acceleration_range_set_)) {
+    p = std::make_shared<Protocol_AccelerationRangeSet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_get_work_mode_)) {
+    p = std::make_shared<Protocol_WorkModeGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_set_work_mode_)) {
+    p = std::make_shared<Protocol_WorkModeSet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_get_flash_data_)) {
+    p = std::make_shared<Protocol_FlashDataGet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_set_flash_data_)) {
+    p = std::make_shared<Protocol_FlashDataSet722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_ld_enable_)) {
+    p = std::make_shared<Protocol_LdEnable722D>();
+  } else if (*sp_cmd == *(CmdRepository722D::CreateInstance()->sp_lidar_state_)) {
+    p = std::make_shared<Protocol_LidarState722D>();
+  } else {
+    return;
+  }
+  p->Load(*protocol);
+
+  std::shared_ptr<ParamsAbstract> params = p->Params;
+  if (typeid(*params) == typeid(Params_LDValue722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+    if (!angle_param_get_flag_) {
+      std::shared_ptr<Params_LDValue722D> param = std::dynamic_pointer_cast<Params_LDValue722D>(params);
+      std::vector<double> vert_angles;
+      std::vector<double> offset_angles;
+      for (int num_of_lines = 0; num_of_lines < param->num_of_lines_; num_of_lines++) {
+        vert_angles.push_back((double)(param->ver_angle_[num_of_lines] / 1000.0));
+        offset_angles.push_back((double)(param->offset_angle_[num_of_lines] / 1000.0));
+      }
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        chan_angles_.loadFromLiDAR(this->param_.angle_path_ver, param->num_of_lines_, vert_angles, offset_angles);
+        WJ_INFOL << "Get LiDAR<LD> angle data..." << WJ_REND;
+      }
+      if (this->param_.send_packet_enable) {
+        this->protocol_ver_angle_table.assign(param->protocol_data_.begin(), param->protocol_data_.end());
+      }
+      angle_param_get_flag_ = true;
+    }
+
+    if (!this->param_.recv_lidar_param_cmd_enable) {
+      if (angle_param_get_flag_) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+        acceleration_range_get_flag_ = true;
+        Decoder<T_PointCloud>::angles_ready_ = true;
+      }
+    } else {
+      if (angle_param_get_flag_ && firmware_version_get_flag_ && sn_get_flag_) {
+        if (this->param_.query_via_external_interface_enable) {
+          if (acceleration_range_get_flag_) {
+            if (!Decoder<T_PointCloud>::angles_ready_) {
+              Decoder<T_PointCloud>::angles_ready_ = true;
+            }
+          }
+        } else {
+          if ((*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_acceleration_range_get_->GetCmdKey()]
+                      .getSendCnt() <= 3 &&
+              !acceleration_range_get_flag_) {
+            return;
+          } else {
+            (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+            (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_acceleration_range_get_->GetCmdKey()]
+                .setStopFlag(true);
+            acceleration_range_get_flag_ = true;
+            Decoder<T_PointCloud>::angles_ready_ = true;
+            if (!scan_data_state_flag_) {
+              setScanDataState(true);
+            }
+          }
+        }
+      }
+    }
+  } else if (typeid(*params) == typeid(Params_FirmwareVersion722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+    if (!firmware_version_get_flag_) {
+      std::shared_ptr<Params_FirmwareVersion722D> param = std::dynamic_pointer_cast<Params_FirmwareVersion722D>(params);
+      if (get_lidar_param_.count((uint16_t)LidarParam::firmware_version) > 0) {
+        get_lidar_param_[(uint16_t)LidarParam::firmware_version] = param->firmware_version_;
+      } else {
+        get_lidar_param_.emplace((uint16_t)LidarParam::firmware_version, param->firmware_version_);
+      }
+
+      WJ_INFOL << "Get lidar firmware version succ ( " << param->firmware_version_ << " )." << WJ_REND;
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      firmware_version_get_flag_ = true;
+      if (this->param_.query_via_external_interface_enable) {
+        if (angle_param_get_flag_ && firmware_version_get_flag_ && sn_get_flag_ && acceleration_range_get_flag_) {
+          if (!Decoder<T_PointCloud>::angles_ready_) {
+            Decoder<T_PointCloud>::angles_ready_ = true;
+          }
+        }
+      }
+    }
+
+  } else if (typeid(*params) == typeid(Params_Sn722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+    if (!sn_get_flag_) {
+      std::shared_ptr<Params_Sn722D> param = std::dynamic_pointer_cast<Params_Sn722D>(params);
+      if (get_lidar_param_.count((uint16_t)LidarParam::sn) > 0) {
+        get_lidar_param_[(uint16_t)LidarParam::sn] = param->sn_;
+      } else {
+        get_lidar_param_.emplace((uint16_t)LidarParam::sn, param->sn_);
+      }
+
+      WJ_INFOL << "Get lidar sn succ ( " << param->sn_ << " )." << WJ_REND;
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      sn_get_flag_ = true;
+      if (this->param_.query_via_external_interface_enable) {
+        if (angle_param_get_flag_ && firmware_version_get_flag_ && sn_get_flag_ && acceleration_range_get_flag_) {
+          if (!Decoder<T_PointCloud>::angles_ready_) {
+            Decoder<T_PointCloud>::angles_ready_ = true;
+          }
+        }
+      }
+    }
+
+  } else if (typeid(*params) == typeid(Params_ScanDataStateSet722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+
+    std::shared_ptr<Params_ScanDataStateSet722D> param = std::dynamic_pointer_cast<Params_ScanDataStateSet722D>(params);
+    if (param->flag_) {
+      if (scan_data_state_flag_ && !angle_param_get_flag_ && !firmware_version_get_flag_ && !sn_get_flag_ && !acceleration_range_get_flag_) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+        scan_data_state_flag_ = false;
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_ld_value_get_->GetCmdKey()].setStopFlag(false);
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_firmware_version_get_->GetCmdKey()].setStopFlag(
+            false);
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_sn_get_->GetCmdKey()].setStopFlag(false);
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_acceleration_range_get_->GetCmdKey()].setStopFlag(
+            false);
+        WJ_INFOL << "Set lidar scan data state succ (stop)." << WJ_REND;
+      } else if (!scan_data_state_flag_ && angle_param_get_flag_ && firmware_version_get_flag_ && sn_get_flag_ && acceleration_range_get_flag_) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+        WJ_INFOL << "Set lidar scan data state succ (start)." << WJ_REND;
+        scan_data_state_flag_ = true;
+      } else {
+        ;
+      }
+    } else {
+      WJ_WARNING << "Set lidar scan data state err." << WJ_REND;
+    }
+  } else if (typeid(*params) == typeid(Params_AccelerationRangeGet722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+
+    std::shared_ptr<Params_AccelerationRangeGet722D> param = std::dynamic_pointer_cast<Params_AccelerationRangeGet722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+
+    acceleration_protocol_flag = true;
+    if (param->state_ <= 3) {
+      if (get_lidar_param_.count((uint16_t)LidarParam::acceleration) > 0) {
+        get_lidar_param_[(uint16_t)LidarParam::acceleration] = std::to_string((uint16_t)param->state_);
+      } else {
+        get_lidar_param_.emplace((uint16_t)LidarParam::acceleration, std::to_string((uint16_t)param->state_));
+      }
+
+      WJ_INFOL << "Get acceleration range succ ( ±" << std::exp2((double)param->state_ + 1.0) << "G )." << WJ_REND;
+
+      if (this->param_.send_lidar_param_enable) {
+        LidarParameterInterface lidar_param;
+        lidar_param.cmd_id = (uint16_t)LidarParam::acceleration;
+        lidar_param.cmd_type = 0;
+        lidar_param.repeat_interval = 0;
+        this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+        this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+      }
+      acceleration_range_get_flag_ = true;
+      if (this->param_.query_via_external_interface_enable) {
+        if (angle_param_get_flag_ && firmware_version_get_flag_ && sn_get_flag_ && acceleration_range_get_flag_) {
+          if (!Decoder<T_PointCloud>::angles_ready_) {
+            Decoder<T_PointCloud>::angles_ready_ = true;
+          }
+        }
+      }
+    } else {
+      WJ_WARNING << "Get acceleration range err." << WJ_REND;
+    }
+  } else if (typeid(*params) == typeid(Params_AccelerationRangeSet722D)) {
+    if (!this->param_.wait_for_difop) {
+      if (Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_ != nullptr) {
+        (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      }
+      return;
+    }
+
+    std::shared_ptr<Params_AccelerationRangeSet722D> param = std::dynamic_pointer_cast<Params_AccelerationRangeSet722D>(params);
+    if (param->flag_) {
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+      (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[CmdRepository722D::CreateInstance()->sp_acceleration_range_get_->GetCmdKey()].setStopFlag(
+          false);
+    } else {
+      WJ_WARNING << "Set acceleration range err." << WJ_REND;
+    }
+  } else if (typeid(*params) == typeid(Params_WorkModeGet722D)) {
+    std::shared_ptr<Params_WorkModeGet722D> param = std::dynamic_pointer_cast<Params_WorkModeGet722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+    uint16_t work_mode = 0xffff;
+    if (param->work_mode_ == 0) {
+      work_mode = 1;
+    } else if (param->work_mode_ == 1) {
+      work_mode = 0;
+    } else {
+      work_mode = param->work_mode_;
+    }
+    if (get_lidar_param_.count((uint16_t)LidarParam::work_mode) > 0) {
+      get_lidar_param_[(uint16_t)LidarParam::work_mode] = std::to_string(work_mode);
+    } else {
+      get_lidar_param_.emplace((uint16_t)LidarParam::work_mode, std::to_string(work_mode));
+    }
+
+    if (this->param_.send_lidar_param_enable) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::work_mode;
+      lidar_param.cmd_type = 0;
+      lidar_param.repeat_interval = 0;
+      this->getLidarParameterDataFormat(lidar_param, get_lidar_param_);
+      this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+    }
+  } else if (typeid(*params) == typeid(Params_WorkModeSet722D)) {
+    std::shared_ptr<Params_WorkModeSet722D> param = std::dynamic_pointer_cast<Params_WorkModeSet722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+
+    uint16_t state = 0;
+    if (param->flag_ == 1) {
+      state = 1;
+    }
+
+    if (this->param_.send_lidar_param_enable) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::work_mode;
+      lidar_param.cmd_type = 0;
+      lidar_param.repeat_interval = 0;
+      lidar_param.data = R"({
+  "state": )" + std::to_string(state) +
+                         R"(
+})";
+      this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+    }
+  } else if (typeid(*params) == typeid(Params_FlashDataGet722D)) {
+    std::shared_ptr<Params_FlashDataGet722D> param = std::dynamic_pointer_cast<Params_FlashDataGet722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+    uint16_t state = 0;
+    std::string data_str = "";
+    std::string buf_str = "";
+
+    if (this->param_.send_lidar_param_enable) {
+      if (param->flag_) {
+        if (param->data_.size() > 0) {
+          buf_str += "[" + std::to_string((uint16_t)(param->data_[0]));
+        }
+        for (uint32_t i = 1; i < param->data_.size(); i++) {
+          buf_str += ", " + std::to_string((uint16_t)(param->data_[i]));
+        }
+        buf_str += "]";
+      } else {
+        buf_str = "[]";
+      }
+
+      data_str = R"({
+  "state": )" + std::to_string((uint16_t)(param->flag_)) +
+                 R"(,
+  "data": )" + buf_str +
+                 R"(
+})";
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::flash_opt;
+      lidar_param.cmd_type = 0;
+      lidar_param.repeat_interval = 0;
+      lidar_param.data = data_str;
+      this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+    }
+  } else if (typeid(*params) == typeid(Params_FlashDataSet722D)) {
+    std::shared_ptr<Params_FlashDataSet722D> param = std::dynamic_pointer_cast<Params_FlashDataSet722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+
+    uint16_t state = 0;
+    if (param->flag_ == 1) {
+      state = 1;
+    }
+
+    if (this->param_.send_lidar_param_enable) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::flash_opt;
+      lidar_param.cmd_type = 1;
+      lidar_param.repeat_interval = 0;
+      lidar_param.data = R"({
+  "state": )" + std::to_string(state) +
+                         R"(
+})";
+      this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+    }
+  } else if (typeid(*params) == typeid(Params_LdEnable722D)) {
+    std::shared_ptr<Params_LdEnable722D> param = std::dynamic_pointer_cast<Params_LdEnable722D>(params);
+    (*(Decoder<T_PointCloud>::get_difo_ctrl_map_ptr_))[sp_cmd->GetCmdKey()].setStopFlag(true);
+
+    uint16_t state = 0;
+    if (param->flag_ == 1) {
+      state = 1;
+    }
+
+    if (this->param_.send_lidar_param_enable) {
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::light_opt;
+      lidar_param.cmd_type = 1;
+      lidar_param.repeat_interval = 0;
+      lidar_param.data = R"({
+  "state": )" + std::to_string(state) +
+                         R"(
+})";
+      this->lidarParameterPublish(lidar_param, this->prev_pkt_ts_);
+    }
+  } else if (typeid(*params) == typeid(Params_LidarState722D)) {
+    std::shared_ptr<Params_LidarState722D> param = std::dynamic_pointer_cast<Params_LidarState722D>(params);
+
+    if (this->param_.send_lidar_param_enable) {
+      uint32_t loss_packets_num = (param->pkt_id_ + 65536 - pre_difop_frame_id_) % 65536;
+      if (loss_packets_num > 1 && pre_difop_frame_id_ >= 0)
+        WJ_WARNING << "difop: loss " << (loss_packets_num - 1) << " packets" << WJ_REND;
+      pre_difop_frame_id_ = param->pkt_id_;
+
+      uint16_t emission_module_sta = 1;
+      uint16_t gps_sta = 1;
+      if (param->emission_module_sta_ != 0xffff) {
+        emission_module_sta = 0;
+      }
+      if (((param->gps_sta_ >> 3) & 0x01) == 0) {
+        gps_sta = 0;
+      }
+      LidarParameterInterface lidar_param;
+      lidar_param.cmd_id = (uint16_t)LidarParam::basic_param;
+      lidar_param.cmd_type = 1;
+      lidar_param.repeat_interval = 0;
+      lidar_param.data = R"({
+  "firmware_version": ")" +
+                         param->firmware_version_ + R"(",
+  "sn": ")" + param->sn_ +
+                         R"(",
+  "emission_module_state": )" +
+                         std::to_string(emission_module_sta) + R"(,
+  "emission_module_temperature": )" +
+                         std::to_string(param->emission_module_temp_ * 1e-2) + R"(,
+  "motor_state": )" + std::to_string((uint16_t)(param->motor_sta_)) +
+                         R"(,
+  "motor_speed": )" + std::to_string((double)(param->motor_speed_ / 4.0)) +
+                         R"(,
+  "imu_acc_range": )" + std::to_string((uint16_t)(param->imu_acc_range_)) +
+                         R"(,
+  "gps_state": )" + std::to_string((uint16_t)(gps_sta)) +
+                         R"(
+})";
+      this->lidarParameterPublish(lidar_param, param->time_stamp_);
+    }
+
+  } else {
+    WJ_WARNING << "Unknown Params Type..." << WJ_REND;
+  }
+}
+
+}  // namespace lidar
+
+}  // namespace vanjee
